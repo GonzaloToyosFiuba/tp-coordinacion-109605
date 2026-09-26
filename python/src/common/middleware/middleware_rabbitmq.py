@@ -105,6 +105,20 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         except Exception as e:
             raise MessageMiddlewareMessageError(f"Error inesperado al enviar mensaje: {e}")
 
+    def send_to(self, message, routing_key):
+        try:
+            self.channel.basic_publish(
+                exchange=self.exchange_name,
+                routing_key=routing_key,
+                body=message
+            )
+        except (pika.exceptions.AMQPConnectionError, pika.exceptions.AMQPChannelError) as e:
+            raise MessageMiddlewareDisconnectedError(f"Error de conexión al enviar mensaje: {e}")
+        except pika.exceptions.AMQPError as e:
+            raise MessageMiddlewareMessageError(f"Error interno al publicar en el exchange: {e}")
+        except Exception as e:
+            raise MessageMiddlewareMessageError(f"Error inesperado al enviar mensaje: {e}")
+
     def start_consuming(self, on_message_callback):
         def internal_callback(ch, method, properties, body):
             delivery_tag = method.delivery_tag

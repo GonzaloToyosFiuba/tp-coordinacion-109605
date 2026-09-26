@@ -23,7 +23,9 @@ class AggregationFilter:
         self.output_queue = middleware.MessageMiddlewareQueueRabbitMQ(
             MOM_HOST, OUTPUT_QUEUE
         )
+
         self.fruit_top_by_client: dict[str, list[fruit_item.FruitItem]] = {}
+        self.eofs_count_by_client: dict[str, int] = {}
 
     def _process_data(self, client_id, fruit, amount):
         logging.info("Processing data message")
@@ -37,11 +39,20 @@ class AggregationFilter:
                 client_top[i] = client_top[i] + fruit_item.FruitItem(
                     fruit, amount
                 )
+                client_top.sort()
                 return
         bisect.insort(client_top, fruit_item.FruitItem(fruit, amount))
 
     def _process_eof(self, client_id):
         logging.info(f"Received EOF for client {client_id}")
+        self.eofs_count_by_client[client_id] = (
+            self.eofs_count_by_client.get(client_id, 0) + 1
+        )
+
+        if self.eofs_count_by_client[client_id] != SUM_AMOUNT:
+            return
+
+        self.eofs_count_by_client.pop(client_id, None)
         client_top = self.fruit_top_by_client.pop(client_id, [])
 
         fruit_chunk = list(client_top[-TOP_SIZE:])
